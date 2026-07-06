@@ -63,8 +63,15 @@ module HDS
 
            ! initialize HDS gatekeeper (large gatekeeping pothole) variables
            gkPondVolFrac = max(gkPondVolFrac, zero)
-           gatekeeperArea = gatekeeperAreaFrac * totalArea
-           gatekeeperVol  = gatekeeperDepth * gatekeeperArea
+           ! guard against missing parameters (realMissing = -9999): a missing depth AND a missing area
+           ! fraction would otherwise multiply to a large *positive* gatekeeperVol and wrongly activate
+           if(gatekeeperDepth > zero .and. gatekeeperAreaFrac > zero)then
+              gatekeeperArea = gatekeeperAreaFrac * totalArea
+              gatekeeperVol  = gatekeeperDepth * gatekeeperArea
+           else
+              gatekeeperArea = zero
+              gatekeeperVol  = zero
+           end if
            if(gatekeeperVol > zero)then
               if(gkPondVol < zero   )  gkPondVol      = gkPondVolFrac * gatekeeperVol ! approximate vol calculation, will be updated later in the subroutine
               if(gkPondArea < zero  )  gkPondArea     = gatekeeperArea*((gkPondVol/gatekeeperVol)**(two/(gatekeeper_p + two)))
@@ -140,6 +147,7 @@ module HDS
         real(rkind)                 :: gatekeeperArea, gatekeeperVol, gkUpsArea ! spatial attributes = gatekeeper area [m2], gatekeeper volume [m3], upstream area draining directly to the gatekeeper [m2]
         real(rkind)                 :: gkInflow                                ! meta-depression outflow partitioned to the gatekeeper [m3]
         real(rkind)                 :: metaBypassFrac                          ! fraction of meta-depression outflow reaching the outlet (not intercepted, or intercepted but not contributing) [-]
+        real(rkind)                 :: gkCatchFrac, gkDrainFrac                ! missing-value-guarded copies of gateCatchAreaFrac/gatekeeperDrainFrac (realMissing = -9999 would otherwise corrupt these formulas)
         ! local variables -- model decisions
         integer(i4b), parameter     :: implicitEuler=1001          ! named variable for the implicit Euler solution
         integer(i4b), parameter     :: shortSubsteps=1002          ! named variable for the short substeps solution
@@ -215,12 +223,23 @@ module HDS
         ! calculate some spatial attributes
         depArea = depAreaFrac * totalArea
         depVol = depDepth * depArea
-        gatekeeperArea = gatekeeperAreaFrac * totalArea
-        gatekeeperVol  = gatekeeperDepth * gatekeeperArea
+        ! guard against missing gatekeeper parameters (realMissing = -9999): a missing depth AND a missing
+        ! area fraction would otherwise multiply to a large *positive* gatekeeperVol and wrongly activate
+        if(gatekeeperDepth > zero .and. gatekeeperAreaFrac > zero)then
+            gatekeeperArea = gatekeeperAreaFrac * totalArea
+            gatekeeperVol  = gatekeeperDepth * gatekeeperArea
+        else
+            gatekeeperArea = zero
+            gatekeeperVol  = zero
+        end if
+        ! clamp the catch/drain fractions too - if left at realMissing (-9999) they would otherwise
+        ! inflate rvrUpsArea, basinConAreaFrac, and basinTotalRunoff even when the gatekeeper is inactive
+        gkCatchFrac = max(gateCatchAreaFrac,   0._rkind)
+        gkDrainFrac = max(gatekeeperDrainFrac, 0._rkind)
         landArea = totalArea - depArea - gatekeeperArea
         depUpsArea = max(landArea * depCatchAreaFrac, 0._rkind)
-        gkUpsArea  = max(landArea * gateCatchAreaFrac, 0._rkind)
-        rvrUpsArea = max(landArea * (1._rkind - depCatchAreaFrac - gateCatchAreaFrac), 0._rkind)
+        gkUpsArea  = max(landArea * gkCatchFrac, 0._rkind)
+        rvrUpsArea = max(landArea * (1._rkind - depCatchAreaFrac - gkCatchFrac), 0._rkind)
 
         ! ---------- option 1: implicit Euler ----------
 
@@ -323,7 +342,7 @@ module HDS
         ! ---------- HDS gatekeeper (large gatekeeping pothole) representation ------------
         ! ---------------------------------------------------------------------------------
         ! partition meta-depression outflow to the gatekeeper
-        gkInflow = gatekeeperDrainFrac * pondOutflow
+        gkInflow = gkDrainFrac * pondOutflow
 
         ! run the gatekeeper (fill-and-spill), only if active for this GRU
         if(gatekeeperVol > zero)then
@@ -338,13 +357,13 @@ module HDS
         gkPondEvap = basinPotentialEvap
 
         ! compute integrated basin contributing areas (meta depression bypass + gatekeeper + non-pothole areas)
-        metaBypassFrac   = one - gatekeeperDrainFrac * (one - gkConAreaFrac)
+        metaBypassFrac   = one - gkDrainFrac * (one - gkConAreaFrac)
         basinConAreaFrac = ( fArea * metaBypassFrac * (depArea + depUpsArea)      &
                             + gkConAreaFrac * (gatekeeperArea + gkUpsArea)        &
                             + rvrUpsArea ) / totalArea
 
         ! adjust runoff values (meta-depression bypass + gatekeeper spill + contribution from non-depressional area)
-        basinTotalRunoff = ((one - gatekeeperDrainFrac)*pondOutflow + gkOutflow) / data_step / totalArea + & !m3/timestep -> m s-1
+        basinTotalRunoff = ((one - gkDrainFrac)*pondOutflow + gkOutflow) / data_step / totalArea + & !m3/timestep -> m s-1
                             (basinTotalRunoff * rvrUpsArea) / totalArea ! m s-1 -> m3 s-1 -> m s-1
         end associate
     end subroutine runDepression

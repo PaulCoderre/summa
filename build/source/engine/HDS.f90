@@ -25,6 +25,8 @@ module HDS
         ! local variables
         real(rkind)                  :: depressionArea                 ! depression area [m2]
         real(rkind)                  :: depressionVol                  ! depression volume [m3]
+        real(rkind)                  :: gatekeeperArea                 ! gatekeeper depression area [m2]
+        real(rkind)                  :: gatekeeperVol                  ! gatekeeper depression volume [m3]
         !*****************************************
         ! initialize HDS pothole storage variables
         ! GRU level
@@ -38,7 +40,15 @@ module HDS
                   pondVol            => bvarData%var(iLookBVAR%pondVol)%dat(1)          , & ! pond volume [m3]
                   pondArea           => bvarData%var(iLookBVAR%pondArea)%dat(1)         , & ! pond Area [m2]
                   depConAreaFrac     => bvarData%var(iLookBVAR%depConAreaFrac)%dat(1)      , & ! fractional contributing area [-]
-                  vMin               => bvarData%var(iLookBVAR%vMin)%dat(1)               & ! minimum pond volume [m3]
+                  vMin               => bvarData%var(iLookBVAR%vMin)%dat(1)               , & ! minimum pond volume [m3]
+                  ! HDS gatekeeper (large gatekeeping pothole) variables
+                  gkPondVolFrac      => bvarData%var(iLookBVAR%gkPondVolFrac)%dat(1)     , & ! gatekeeper pond volume fraction [-]
+                  gatekeeperDepth    => bparGRU%var(iLookBPAR%gatekeeperDepth)           , & ! gatekeeper depth [m]
+                  gatekeeperAreaFrac => bparGRU%var(iLookBPAR%gatekeeperAreaFrac)        , & ! gatekeeper area fraction [-]
+                  gatekeeper_p       => bparGRU%var(iLookBPAR%gatekeeper_p)              , & ! shape of the gatekeeper slope profile [-]
+                  gkPondVol          => bvarData%var(iLookBVAR%gkPondVol)%dat(1)         , & ! gatekeeper pond volume [m3]
+                  gkPondArea         => bvarData%var(iLookBVAR%gkPondArea)%dat(1)        , & ! gatekeeper pond Area [m2]
+                  gkConAreaFrac      => bvarData%var(iLookBVAR%gkConAreaFrac)%dat(1)       & ! gatekeeper fractional contributing area [-]
         )
 
            pondVolFrac = max(pondVolFrac, zero)
@@ -50,6 +60,19 @@ module HDS
            if(pondArea < zero      )  pondArea        = depressionArea*((pondVol/depressionVol)**(two/(p + two)))
            if(depConAreaFrac < zero)  depConAreaFrac  = pondVol/depressionVol ! assume that contrib_frac = vol_frac_sml for initialization purposes
            if(vMin < zero          )  vMin            = pondVol
+
+           ! initialize HDS gatekeeper (large gatekeeping pothole) variables
+           gkPondVolFrac = max(gkPondVolFrac, zero)
+           gatekeeperArea = gatekeeperAreaFrac * totalArea
+           gatekeeperVol  = gatekeeperDepth * gatekeeperArea
+           if(gatekeeperVol > zero)then
+              if(gkPondVol < zero   )  gkPondVol      = gkPondVolFrac * gatekeeperVol ! approximate vol calculation, will be updated later in the subroutine
+              if(gkPondArea < zero  )  gkPondArea     = gatekeeperArea*((gkPondVol/gatekeeperVol)**(two/(gatekeeper_p + two)))
+              if(gkConAreaFrac < zero) gkConAreaFrac  = zero ! gatekeeper starts non-contributing (no hysteresis to seed, unlike the meta depression)
+           else
+              ! no gatekeeper for this GRU
+              gkPondVol = zero;  gkPondArea = zero;  gkConAreaFrac = zero
+           end if
         end associate
     end subroutine init_summa_HDS
     !=============================================================
@@ -111,8 +134,12 @@ module HDS
         real(rkind)  , parameter    :: tau=0._rkind                  ! model parameters   = tau  time constant linear reservoir [timestep-1] ! currently deactivated
         ! local variables -- general
         real(rkind)                 :: qSeas, pRate, etPond                    ! forcing data = runoff, precipitation, ET [mm/timestep]
-        real(rkind)                 :: depArea, depVol, depUpsArea, landArea   ! spatial attributes = depression area [m2], depression volume [m3], upstream area of depressions [m2], land area = total area - depression area (m2)
+        real(rkind)                 :: depArea, depVol, depUpsArea, landArea   ! spatial attributes = depression area [m2], depression volume [m3], upstream area of depressions [m2], land area = total area - depression area - gatekeeper area (m2)
         real(rkind)                 :: rvrUpsArea                              ! spatial attributes = upland area contributing to the river from non-pothole areas [m2]
+        ! local variables -- HDS gatekeeper (large gatekeeping pothole)
+        real(rkind)                 :: gatekeeperArea, gatekeeperVol, gkUpsArea ! spatial attributes = gatekeeper area [m2], gatekeeper volume [m3], upstream area draining directly to the gatekeeper [m2]
+        real(rkind)                 :: gkInflow                                ! meta-depression outflow partitioned to the gatekeeper [m3]
+        real(rkind)                 :: metaBypassFrac                          ! fraction of meta-depression outflow reaching the outlet (not intercepted, or intercepted but not contributing) [-]
         ! local variables -- model decisions
         integer(i4b), parameter     :: implicitEuler=1001          ! named variable for the implicit Euler solution
         integer(i4b), parameter     :: shortSubsteps=1002          ! named variable for the short substeps solution
@@ -151,7 +178,20 @@ module HDS
                  depAreaFrac             =>    bparGRU%var(iLookBPAR%depressionAreaFrac)         , &    ! fractional depressional area (depressionArea/basinArea) (-)
                  depCatchAreaFrac        =>    bparGRU%var(iLookBPAR%depressionCatchAreaFrac)    , &    ! fractional area (of the landArea= basinArea - depressionArea) that drains to the depressions (-)
                  p                       =>    bparGRU%var(iLookBPAR%depression_p)               , &    ! shape of the slope profile (-)
-                 b                       =>    bparGRU%var(iLookBPAR%depression_p)                 &    ! shape of contributing fraction curve (-)
+                 b                       =>    bparGRU%var(iLookBPAR%depression_p)               , &    ! shape of contributing fraction curve (-)
+                 ! HDS gatekeeper (large gatekeeping pothole) variables
+                 gkPondVol               =>    bvarData%var(iLookBVAR%gkPondVol)%dat(1)          , &    ! gatekeeper pond volume at the end of time step (m3)
+                 gkPondVolFrac           =>    bvarData%var(iLookBVAR%gkPondVolFrac)%dat(1)      , &    ! fractional gatekeeper pond volume = gkPondVol/gatekeeperVol (-)
+                 gkPondArea              =>    bvarData%var(iLookBVAR%gkPondArea)%dat(1)         , &    ! gatekeeper pond area at the end of the time step (m2)
+                 gkConAreaFrac           =>    bvarData%var(iLookBVAR%gkConAreaFrac)%dat(1)      , &    ! contributing area fraction of the gatekeeper (binary: contributing only when spilling) [-]
+                 gkOutflow               =>    bvarData%var(iLookBVAR%gkOutflow)%dat(1)          , &    ! gatekeeper outflow (m3)
+                 gkPondEvap              =>    bvarData%var(iLookBVAR%gkPondEvap)%dat(1)         , &    ! gatekeeper pond evaporation (kg m-2 s-1)
+                 ! HDS gatekeeper (large gatekeeping pothole) parameters
+                 gatekeeperDepth         =>    bparGRU%var(iLookBPAR%gatekeeperDepth)            , &    ! gatekeeper depth (m)
+                 gatekeeperAreaFrac      =>    bparGRU%var(iLookBPAR%gatekeeperAreaFrac)         , &    ! fractional gatekeeper depressional area (gatekeeperArea/basinArea) (-)
+                 gateCatchAreaFrac       =>    bparGRU%var(iLookBPAR%gateCatchAreaFrac)          , &    ! fractional area (of the landArea) that drains directly to the gatekeeper (-)
+                 gatekeeperDrainFrac     =>    bparGRU%var(iLookBPAR%gatekeeperDrainFrac)        , &    ! fraction of meta-depression outflow intercepted by the gatekeeper (-)
+                 gatekeeper_p            =>    bparGRU%var(iLookBPAR%gatekeeper_p)                 &    ! shape of the gatekeeper slope profile (-)
          )
         ! exit the subroutine if depDepth for this GRU is <= 0 (i.e., this GRU does not have depressions)
         if(depDepth <= zero) return
@@ -175,9 +215,12 @@ module HDS
         ! calculate some spatial attributes
         depArea = depAreaFrac * totalArea
         depVol = depDepth * depArea
-        landArea = totalArea - depArea
+        gatekeeperArea = gatekeeperAreaFrac * totalArea
+        gatekeeperVol  = gatekeeperDepth * gatekeeperArea
+        landArea = totalArea - depArea - gatekeeperArea
         depUpsArea = max(landArea * depCatchAreaFrac, 0._rkind)
-        rvrUpsArea = landArea * (1._rkind - depCatchAreaFrac)
+        gkUpsArea  = max(landArea * gateCatchAreaFrac, 0._rkind)
+        rvrUpsArea = max(landArea * (1._rkind - depCatchAreaFrac - gateCatchAreaFrac), 0._rkind)
 
         ! ---------- option 1: implicit Euler ----------
 
@@ -275,10 +318,33 @@ module HDS
         pondOutflow = Q_do
         ! pond evaporation [kg m-2 s-1]
         pondEvap = basinPotentialEvap
-        ! compute integrated basin contributing areas
-        basinConAreaFrac = ((fArea * (depArea + depUpsArea)) + rvrUpsArea)/totalArea
-        ! adjust runoff values (pondoutflow + contribution from non-depressional area)
-        basinTotalRunoff = pondOutflow / data_step / totalArea + & !m3/timestep -> m s-1
+
+        ! ---------------------------------------------------------------------------------
+        ! ---------- HDS gatekeeper (large gatekeeping pothole) representation ------------
+        ! ---------------------------------------------------------------------------------
+        ! partition meta-depression outflow to the gatekeeper
+        gkInflow = gatekeeperDrainFrac * pondOutflow
+
+        ! run the gatekeeper (fill-and-spill), only if active for this GRU
+        if(gatekeeperVol > zero)then
+            call run_Gatekeeper(gkPondVol, gkInflow, qSeas, pRate, etPond,        &
+                                gatekeeperArea, gatekeeperVol, gkUpsArea,          &
+                                gatekeeper_p, tau, dt,                             &
+                                gkPondVolFrac, gkConAreaFrac, gkPondArea, gkOutflow)
+        else
+            gkOutflow = zero ! flux, must be reset each step when the gatekeeper is inactive
+        end if
+        ! gatekeeper pond evaporation [kg m-2 s-1]
+        gkPondEvap = basinPotentialEvap
+
+        ! compute integrated basin contributing areas (meta depression bypass + gatekeeper + non-pothole areas)
+        metaBypassFrac   = one - gatekeeperDrainFrac * (one - gkConAreaFrac)
+        basinConAreaFrac = ( fArea * metaBypassFrac * (depArea + depUpsArea)      &
+                            + gkConAreaFrac * (gatekeeperArea + gkUpsArea)        &
+                            + rvrUpsArea ) / totalArea
+
+        ! adjust runoff values (meta-depression bypass + gatekeeper spill + contribution from non-depressional area)
+        basinTotalRunoff = ((one - gatekeeperDrainFrac)*pondOutflow + gkOutflow) / data_step / totalArea + & !m3/timestep -> m s-1
                             (basinTotalRunoff * rvrUpsArea) / totalArea ! m s-1 -> m3 s-1 -> m s-1
         end associate
     end subroutine runDepression
@@ -362,5 +428,150 @@ module HDS
         dgdv = didv*(one  - cFrac) - dfdv*Q_di - dadv*eLosses - tau
 
     end subroutine computFlux
+
+    !=============================================================
+    !=============================================================
+    subroutine run_Gatekeeper(gkPondVol, gkInflow, qSeas, pRate, etPond,    &  ! input/output: state; input: forcing
+                              gatekeeperArea, gatekeeperVol, upslopeArea_gk, & ! input: spatial attributes
+                              p, tau, dt,                                     & ! input: parameters, timestep
+                              gkVolFrac, gkConAreaFrac, gkPondArea, gkOutflow)  ! output: diagnostics, outflow
+
+        ! Fill-and-spill bucket for the gatekeeping depression using implicit Euler.
+        ! Binary contributing area
+        implicit none
+
+        ! subroutine arguments
+        real(rkind), intent(inout) :: gkPondVol              ! state variable: pond volume [m3]
+        real(rkind), intent(in)    :: gkInflow               ! inflow partitioned from meta-depression outflow [m3/timestep]
+        real(rkind), intent(in)    :: qSeas, pRate, etPond   ! forcing: runoff, precip, ET [kg m-2 timestep-1]
+        real(rkind), intent(in)    :: gatekeeperArea         ! max gatekeeper depression area [m2]
+        real(rkind), intent(in)    :: gatekeeperVol          ! max gatekeeper depression volume [m3]
+        real(rkind), intent(in)    :: upslopeArea_gk         ! upslope area draining directly to gatekeeper [m2]
+        real(rkind), intent(in)    :: p                      ! shape of the slope profile [-]
+        real(rkind), intent(in)    :: tau                    ! infiltration time constant [timestep-1]
+        real(rkind), intent(in)    :: dt                     ! timestep [-]
+        real(rkind), intent(out)   :: gkVolFrac              ! volume fraction [-]
+        real(rkind), intent(out)   :: gkConAreaFrac          ! contributing area fraction [-] (binary: 0 or 1)
+        real(rkind), intent(out)   :: gkPondArea             ! pond area [m2]
+        real(rkind), intent(out)   :: gkOutflow              ! outflow [m3/timestep]
+
+        ! local variables - iteration control
+        integer(i4b), parameter    :: nIter = 100            ! max iterations
+        real(rkind),  parameter    :: xConv = 1.e-6_rkind    ! convergence criteria
+        integer(i4b)               :: iter                   ! iteration counter
+        real(rkind)                :: xMin, xMax             ! bracketing bounds
+        real(rkind)                :: xRes                   ! residual
+        real(rkind)                :: xVol                   ! trial volume
+
+        ! local variables - physics
+        real(rkind), parameter     :: verySmall = 1.0e-12_rkind ! very small value
+        real(rkind), parameter     :: rCoef = 0.050_rkind    ! runoff coefficient [-]
+        real(rkind)                :: pInput                 ! precipitation depth [m/timestep]
+        real(rkind)                :: qInput                 ! surface runoff depth [m/timestep]
+        real(rkind)                :: eLosses                ! evaporation depth [m/timestep]
+        real(rkind)                :: Q_in                   ! total inflow [m3/timestep]
+        real(rkind)                :: Q_det                  ! evaporation loss [m3/timestep]
+        real(rkind)                :: Q_dix                  ! infiltration loss [m3/timestep]
+        real(rkind)                :: g                      ! net flux [m3/timestep] (without outflow)
+        real(rkind)                :: dgdv                   ! derivative of net flux w.r.t. volume
+        real(rkind)                :: dadv                   ! derivative of area w.r.t. volume
+        real(rkind)                :: trialPondArea          ! pond area for trial volume
+
+        ! --- convert forcing units (same as computFlux) ---
+        pInput  = pRate  / iden_water                        ! kg m-2 timestep-1 -> m timestep-1
+        qInput  = qSeas  / iden_water + rCoef * pRate / iden_water  ! surface runoff
+        eLosses = etPond / iden_water                        ! evaporation
+
+        ! --- initialize for implicit Euler ---
+        xVol = gkPondVol
+        xMin = zero
+        xMax = gatekeeperVol * 2.0_rkind  ! allow exceeding capacity during iteration
+        gkOutflow = zero  ! initialize outflow
+
+        ! --- implicit Euler iteration (no outflow term - handle fill-and-spill after convergence) ---
+        do iter = 1, nIter
+
+            ! compute pond area for trial volume (Eq 4)
+            if (xVol > zero) then
+                trialPondArea = gatekeeperArea * ((min(xVol, gatekeeperVol) / gatekeeperVol) ** (two / (p + two)))
+            else
+                trialPondArea = zero
+            end if
+
+            ! total inflow (same structure as Q_di)
+            Q_in = gkInflow                                                      &
+                 + upslopeArea_gk * qInput                                       &
+                 + (gatekeeperArea - trialPondArea) * qInput                     &
+                 + trialPondArea * pInput
+
+            ! losses
+            Q_det = trialPondArea * eLosses                  ! evaporation
+            Q_dix = tau * min(xVol, gatekeeperVol)          ! infiltration (only from stored volume)
+
+            ! net flux (NO outflow term - we handle spilling after convergence)
+            g = Q_in - Q_det - Q_dix
+
+            ! compute residual
+            xRes = (gkPondVol + g * dt) - xVol
+
+            ! check convergence
+            if (iter > 1 .and. abs(xRes) < xConv) exit
+
+            ! compute derivative for Newton-Raphson step
+            ! dadv: derivative of pond area w.r.t. volume (only valid below capacity)
+            if (xVol > verySmall .and. xVol < gatekeeperVol) then
+                dadv = ((two * gatekeeperArea) / ((p + two) * gatekeeperVol)) * &
+                       ((xVol / gatekeeperVol) ** (-p / (p + two)))
+            else
+                dadv = zero
+            end if
+
+            ! dgdv: derivative of net flux w.r.t. volume
+            dgdv = dadv * (pInput - qInput) - dadv * eLosses - tau
+
+            ! update constraints for bracketing
+            if (xRes > zero) xMin = xVol
+            if (xRes < zero) xMax = xVol
+
+            ! special case where xMax is too small
+            if (xRes > zero .and. xVol > 0.99_rkind * xMax) then
+                xMax = xMax * 2.0_rkind
+            end if
+
+            ! Newton-Raphson update
+            xVol = xVol + xRes / (one - dgdv * dt)
+
+            ! use bisection if violated constraints
+            if (xVol < xMin .or. xVol > xMax) xVol = (xMin + xMax) / 2.0_rkind
+
+        end do ! iteration loop
+
+        ! --- apply fill-and-spill constraint after convergence ---
+        if (xVol > gatekeeperVol) then
+            ! excess volume spills out
+            gkOutflow = xVol - gatekeeperVol
+            gkPondVol = gatekeeperVol
+            gkConAreaFrac = one                              ! contributing when spilling
+        else if (xVol < zero) then
+            ! losses exceeded available water
+            gkOutflow = zero
+            gkPondVol = zero
+            gkConAreaFrac = zero
+        else
+            ! normal case: volume below capacity
+            gkOutflow = zero
+            gkPondVol = xVol
+            gkConAreaFrac = zero                             ! not contributing until full
+        end if
+
+        ! --- final diagnostics ---
+        gkVolFrac = gkPondVol / gatekeeperVol
+        if (gkPondVol > zero) then
+            gkPondArea = gatekeeperArea * ((gkPondVol / gatekeeperVol) ** (two / (p + two)))
+        else
+            gkPondArea = zero
+        end if
+
+    end subroutine run_Gatekeeper
 
 end module HDS

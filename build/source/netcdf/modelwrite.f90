@@ -493,7 +493,7 @@ contains
  integer(i4b),allocatable           :: ncVarID(:)    ! netcdf variable id
  integer(i4b)                       :: ncSnowID      ! index variable id
  integer(i4b)                       :: ncSoilID      ! index variable id
- integer(i4b),dimension(4)          :: hdsInitIdx    ! intermediate array of loop indices for HDS initial conditions
+ integer(i4b),dimension(7)          :: hdsInitIdx    ! intermediate array of loop indices for HDS initial conditions (incl. gatekeeper)
 
  integer(i4b)                       :: nSoil         ! number of soil layers
  integer(i4b)                       :: nSnow         ! number of snow layers
@@ -542,7 +542,7 @@ contains
 
  ! size of prognostic variable vector
  nProgVars = size(prog_meta)
- allocate(ncVarID(nProgVars+5))     ! include 5 additional basin variable in ID array (routing + HDS variables)
+ allocate(ncVarID(nProgVars+8))     ! include 8 additional basin variable in ID array (routing + HDS variables, incl. gatekeeper)
 
  ! maximum number of soil layers
  maxSoil = gru_struc(1)%hruInfo(1)%nSoil
@@ -606,8 +606,9 @@ contains
  err = nf90_put_att(ncid,ncVarID(nProgVars+1),'long_name',trim(bvar_meta(iLookBVAR%routingRunoffFuture)%vardesc));   call netcdf_err(err,message)
  err = nf90_put_att(ncid,ncVarID(nProgVars+1),'units'    ,trim(bvar_meta(iLookBVAR%routingRunoffFuture)%varunit));   call netcdf_err(err,message)
  
- ! write HDS related states
- hdsInitIdx = (/iLookBVAR%pondVolFrac, iLookBVAR%vMin, iLookBVAR%depConAreaFrac, iLookBVAR%pondArea/) ! HDS initial conditions
+ ! write HDS related states (meta depression + gatekeeper)
+ hdsInitIdx = (/iLookBVAR%pondVolFrac, iLookBVAR%vMin, iLookBVAR%depConAreaFrac, iLookBVAR%pondArea, &
+                iLookBVAR%gkPondVolFrac, iLookBVAR%gkConAreaFrac, iLookBVAR%gkPondArea/) ! HDS initial conditions
 
  do i = 1,size(hdsInitIdx)
   iVar = hdsInitIdx(i)

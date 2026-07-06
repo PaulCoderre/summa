@@ -196,7 +196,7 @@ contains
  integer(i4b)                           :: fileGRU      ! number of GRUs in file
  integer(i4b)                           :: iVar, i      ! loop indices
  integer(i4b),dimension(1)              :: ndx          ! intermediate array of loop indices
- integer(i4b),dimension(4)              :: hdsInitIdx   ! intermediate array of loop indices for HDS initial conditions
+ integer(i4b),dimension(7)              :: hdsInitIdx   ! intermediate array of loop indices for HDS initial conditions (incl. gatekeeper)
  integer(i4b)                           :: iGRU         ! loop index
  integer(i4b)                           :: iHRU         ! loop index
  integer(i4b)                           :: dimID        ! varible dimension ids
@@ -402,7 +402,8 @@ contains
  ! get basin variables for HDS
  !********************************
  if(model_decisions(iLookDECISIONS%prPotholes)%iDecision == HDSmodel)then
-  hdsInitIdx = (/iLookBVAR%pondVolFrac, iLookBVAR%vMin, iLookBVAR%depConAreaFrac, iLookBVAR%pondArea/) ! HDS initial conditions
+  hdsInitIdx = (/iLookBVAR%pondVolFrac, iLookBVAR%vMin, iLookBVAR%depConAreaFrac, iLookBVAR%pondArea, &
+                 iLookBVAR%gkPondVolFrac, iLookBVAR%gkConAreaFrac, iLookBVAR%gkPondArea/) ! HDS initial conditions (meta depression + gatekeeper)
   message='updateHDS_States/'
   ! get number of GRUs in file
   err = nf90_inq_dimid(ncID,"gru",dimID)

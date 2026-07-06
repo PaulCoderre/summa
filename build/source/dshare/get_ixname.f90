@@ -871,6 +871,12 @@ contains
   case('depressionCatchAreaFrac'); get_ixbpar = iLookBPAR%depressionCatchAreaFrac     ! fractional area (of the landArea= basinArea - depressionArea) that drains to the depressions (-)
   case('depression_p'           ); get_ixbpar = iLookBPAR%depression_p                ! shape of the slope profile (-)
   case('depression_b'           ); get_ixbpar = iLookBPAR%depression_b                ! shape of contributing fraction curve (-)
+  ! parameters for HDS gatekeeper (large gatekeeping pothole) representation
+  case('gatekeeperDepth'        ); get_ixbpar = iLookBPAR%gatekeeperDepth             ! average depth of gatekeeper depressional storage (gatekeeperVol/gatekeeperArea) (m)
+  case('gatekeeperAreaFrac'     ); get_ixbpar = iLookBPAR%gatekeeperAreaFrac          ! fractional gatekeeper depressional area (gatekeeperArea/basinArea) (-)
+  case('gateCatchAreaFrac'      ); get_ixbpar = iLookBPAR%gateCatchAreaFrac           ! fractional area (of the landArea = basinArea - depressionArea - gatekeeperArea) that drains directly to the gatekeeper (-)
+  case('gatekeeperDrainFrac'    ); get_ixbpar = iLookBPAR%gatekeeperDrainFrac         ! fraction of meta-depression outflow intercepted by the gatekeeper (-)
+  case('gatekeeper_p'           ); get_ixbpar = iLookBPAR%gatekeeper_p                ! shape of the gatekeeper slope profile (-)
   ! get to here if cannot find the variable
   case default
    get_ixbpar = integerMissing
@@ -914,6 +920,13 @@ contains
   case('pondArea'                      ); get_ixbvar = iLookBVAR%pondArea                        ! pond area at the end of the time step (m2)
   case('pondOutflow'                   ); get_ixbvar = iLookBVAR%pondOutflow                     ! pond outflow (m3)
   case('pondEvap'                      ); get_ixbvar = iLookBVAR%pondEvap                        ! pond evaporation (kg m-2 s-1)
+  ! variables for HDS gatekeeper (large gatekeeping pothole) representation
+  case('gkConAreaFrac'                 ); get_ixbvar = iLookBVAR%gkConAreaFrac                   ! contributing area fraction of the gatekeeper (binary: contributing only when spilling) [-]
+  case('gkPondVolFrac'                 ); get_ixbvar = iLookBVAR%gkPondVolFrac                   ! fractional gatekeeper pond volume = gkPondVol/gatekeeperVol (-)
+  case('gkPondVol'                     ); get_ixbvar = iLookBVAR%gkPondVol                       ! gatekeeper pond volume at the end of time step (m3)
+  case('gkPondArea'                    ); get_ixbvar = iLookBVAR%gkPondArea                      ! gatekeeper pond area at the end of the time step (m2)
+  case('gkOutflow'                     ); get_ixbvar = iLookBVAR%gkOutflow                       ! gatekeeper outflow (m3)
+  case('gkPondEvap'                    ); get_ixbvar = iLookBVAR%gkPondEvap                      ! gatekeeper pond evaporation (kg m-2 s-1)
   ! get to here if cannot find the variable
   case default
    get_ixbvar = integerMissing

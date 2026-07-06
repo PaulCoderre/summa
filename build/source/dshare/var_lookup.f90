@@ -700,6 +700,12 @@ MODULE var_lookup
   integer(i4b)    :: depressionCatchAreaFrac    = integerMissing ! fractional area (of the landArea = basinArea - depressionArea) that drains to the depressions (-)
   integer(i4b)    :: depression_p               = integerMissing ! shape of the slope profile (-)
   integer(i4b)    :: depression_b               = integerMissing ! shape of contributing fraction curve (-)
+  ! define parameters for HDS gatekeeper (large gatekeeping pothole) representation
+  integer(i4b)    :: gatekeeperDepth            = integerMissing ! average depth of gatekeeper depressional storage (gatekeeperVol/gatekeeperArea) (m)
+  integer(i4b)    :: gatekeeperAreaFrac         = integerMissing ! fractional gatekeeper depressional area (gatekeeperArea/basinArea) (-)
+  integer(i4b)    :: gateCatchAreaFrac          = integerMissing ! fractional area (of the landArea = basinArea - depressionArea - gatekeeperArea) that drains directly to the gatekeeper (-)
+  integer(i4b)    :: gatekeeperDrainFrac        = integerMissing ! fraction of meta-depression outflow intercepted by the gatekeeper (-)
+  integer(i4b)    :: gatekeeper_p               = integerMissing ! shape of the gatekeeper slope profile (-)
  endtype iLook_bpar
 
  ! ***********************************************************************************************************
@@ -731,6 +737,13 @@ MODULE var_lookup
   integer(i4b)    :: pondArea                   = integerMissing ! pond area at the end of the time step (m2)
   integer(i4b)    :: pondOutflow                = integerMissing ! pond outflow (m3)
   integer(i4b)    :: pondEvap                   = integerMissing ! pond evaporation (kg m-2 s-1)
+  ! define variables for HDS gatekeeper (large gatekeeping pothole) representation
+  integer(i4b)    :: gkConAreaFrac              = integerMissing ! contributing area fraction of the gatekeeper (binary: contributing only when spilling) [-]
+  integer(i4b)    :: gkPondVolFrac              = integerMissing ! fractional gatekeeper pond volume at the end of time step (-)
+  integer(i4b)    :: gkPondVol                  = integerMissing ! gatekeeper pond volume at the end of time step (m3)
+  integer(i4b)    :: gkPondArea                 = integerMissing ! gatekeeper pond area at the end of the time step (m2)
+  integer(i4b)    :: gkOutflow                  = integerMissing ! gatekeeper outflow (m3)
+  integer(i4b)    :: gkPondEvap                 = integerMissing ! gatekeeper pond evaporation (kg m-2 s-1)
  endtype iLook_bvar
 
  ! ***********************************************************************************************************

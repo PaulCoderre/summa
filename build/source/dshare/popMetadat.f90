@@ -307,6 +307,15 @@ contains
  bpar_meta(iLookBPAR%depression_b)                    = var_info('depression_b'             , 'shape of contributing fraction curve'                                                       , '-'    , get_ixVarType('scalarv'), iMissVec, iMissVec, .false.)
 
  ! -----
+ ! * HDS gatekeeper (large gatekeeping pothole) parameters...
+ ! -----------------------------------
+ bpar_meta(iLookBPAR%gatekeeperDepth)                 = var_info('gatekeeperDepth'          , 'average depth of gatekeeper depressional storage (gatekeeperVol/gatekeeperArea)'             , 'm'    , get_ixVarType('scalarv'), iMissVec, iMissVec, .false.)
+ bpar_meta(iLookBPAR%gatekeeperAreaFrac)              = var_info('gatekeeperAreaFrac'       , 'fractional gatekeeper depressional area (gatekeeperArea/basinArea)'                          , '-'    , get_ixVarType('scalarv'), iMissVec, iMissVec, .false.)
+ bpar_meta(iLookBPAR%gateCatchAreaFrac)               = var_info('gateCatchAreaFrac'        , 'fractional area of the landArea (basinArea - depressionArea - gatekeeperArea) that drains directly to the gatekeeper', '-'    , get_ixVarType('scalarv'), iMissVec, iMissVec, .false.)
+ bpar_meta(iLookBPAR%gatekeeperDrainFrac)             = var_info('gatekeeperDrainFrac'      , 'fraction of meta-depression outflow intercepted by the gatekeeper'                           , '-'    , get_ixVarType('scalarv'), iMissVec, iMissVec, .false.)
+ bpar_meta(iLookBPAR%gatekeeper_p)                    = var_info('gatekeeper_p'             , 'shape of the gatekeeper slope profile'                                                       , '-'    , get_ixVarType('scalarv'), iMissVec, iMissVec, .false.)
+
+ ! -----
  ! * local model prognostic (state) variables...
  ! ---------------------------------------------
  ! define variables for time stepping
@@ -618,8 +627,18 @@ contains
  bvar_meta(iLookBVAR%pondVolFrac)             = var_info('pondVolFrac'      , 'fractional pond volume at the end of time step'                                                , '-'          , get_ixVarType('scalarv'), iMissVec, iMissVec, .false.)   
  bvar_meta(iLookBVAR%pondVol)                 = var_info('pondVol'          , 'pond volume at the end of time step'                                                           , 'm3'         , get_ixVarType('scalarv'), iMissVec, iMissVec, .false.)   
  bvar_meta(iLookBVAR%pondArea)                = var_info('pondArea'         , 'pond area at the end of the time step'                                                         , 'm2'         , get_ixVarType('scalarv'), iMissVec, iMissVec, .false.)   
- bvar_meta(iLookBVAR%pondOutflow)             = var_info('pondOutflow'      , 'pond outflow'                                                                                  , 'm3'         , get_ixVarType('scalarv'), iMissVec, iMissVec, .false.)   
- bvar_meta(iLookBVAR%pondEvap)                = var_info('pondEvap'         , 'pond evaporation'                                                                              , 'kg m-2 s-1' , get_ixVarType('scalarv'), iMissVec, iMissVec, .false.)   
+ bvar_meta(iLookBVAR%pondOutflow)             = var_info('pondOutflow'      , 'pond outflow'                                                                                  , 'm3'         , get_ixVarType('scalarv'), iMissVec, iMissVec, .false.)
+ bvar_meta(iLookBVAR%pondEvap)                = var_info('pondEvap'         , 'pond evaporation'                                                                              , 'kg m-2 s-1' , get_ixVarType('scalarv'), iMissVec, iMissVec, .false.)
+
+ ! -----
+ ! * basin-wide HDS gatekeeper (large gatekeeping pothole) fluxes/variables...
+ ! -----------------------------------------
+ bvar_meta(iLookBVAR%gkConAreaFrac)           = var_info('gkConAreaFrac'    , 'contributing area fraction of the gatekeeper (binary: contributing only when spilling)'        , '-'          , get_ixVarType('scalarv'), iMissVec, iMissVec, .false.)
+ bvar_meta(iLookBVAR%gkPondVolFrac)           = var_info('gkPondVolFrac'    , 'fractional gatekeeper pond volume at the end of time step'                                     , '-'          , get_ixVarType('scalarv'), iMissVec, iMissVec, .false.)
+ bvar_meta(iLookBVAR%gkPondVol)               = var_info('gkPondVol'        , 'gatekeeper pond volume at the end of time step'                                                , 'm3'         , get_ixVarType('scalarv'), iMissVec, iMissVec, .false.)
+ bvar_meta(iLookBVAR%gkPondArea)              = var_info('gkPondArea'       , 'gatekeeper pond area at the end of the time step'                                              , 'm2'         , get_ixVarType('scalarv'), iMissVec, iMissVec, .false.)
+ bvar_meta(iLookBVAR%gkOutflow)               = var_info('gkOutflow'        , 'gatekeeper outflow'                                                                             , 'm3'         , get_ixVarType('scalarv'), iMissVec, iMissVec, .false.)
+ bvar_meta(iLookBVAR%gkPondEvap)              = var_info('gkPondEvap'       , 'gatekeeper pond evaporation'                                                                    , 'kg m-2 s-1' , get_ixVarType('scalarv'), iMissVec, iMissVec, .false.)
 
  ! -----
  ! * model indices...

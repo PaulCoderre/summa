@@ -233,9 +233,19 @@ module HDS
             gatekeeperVol  = zero
         end if
         ! clamp the catch/drain fractions too - if left at realMissing (-9999) they would otherwise
-        ! inflate rvrUpsArea, basinConAreaFrac, and basinTotalRunoff even when the gatekeeper is inactive
-        gkCatchFrac = max(gateCatchAreaFrac,   0._rkind)
-        gkDrainFrac = max(gatekeeperDrainFrac, 0._rkind)
+        ! inflate rvrUpsArea, basinConAreaFrac, and basinTotalRunoff even when the gatekeeper is inactive.
+        ! Also force both to zero whenever the gatekeeper itself is inactive (gatekeeperVol <= zero),
+        ! independent of whatever raw values the parameters hold - otherwise a stray non-zero
+        ! gateCatchAreaFrac/gatekeeperDrainFrac on an inactive-gatekeeper row diverts land area and
+        ! meta-depression outflow into gkUpsArea/gkInflow that never gets returned (mass-balance leak),
+        ! since run_Gatekeeper is never called to give it back via gkOutflow.
+        if(gatekeeperVol > zero)then
+            gkCatchFrac = max(gateCatchAreaFrac,   0._rkind)
+            gkDrainFrac = max(gatekeeperDrainFrac, 0._rkind)
+        else
+            gkCatchFrac = zero
+            gkDrainFrac = zero
+        end if
         landArea = totalArea - depArea - gatekeeperArea
         depUpsArea = max(landArea * depCatchAreaFrac, 0._rkind)
         gkUpsArea  = max(landArea * gkCatchFrac, 0._rkind)
@@ -494,6 +504,7 @@ module HDS
         real(rkind)                :: g                      ! net flux [m3/timestep] (without outflow)
         real(rkind)                :: dgdv                   ! derivative of net flux w.r.t. volume
         real(rkind)                :: dadv                   ! derivative of area w.r.t. volume
+        real(rkind)                :: dtaudv                 ! derivative of infiltration loss w.r.t. volume
         real(rkind)                :: trialPondArea          ! pond area for trial volume
 
         ! --- convert forcing units (same as computFlux) ---
@@ -538,15 +549,19 @@ module HDS
 
             ! compute derivative for Newton-Raphson step
             ! dadv: derivative of pond area w.r.t. volume (only valid below capacity)
+            ! dtaudv: derivative of infiltration loss w.r.t. volume (Q_dix = tau*min(xVol,gatekeeperVol) is
+            ! constant once xVol >= gatekeeperVol, so its derivative is zero there - same condition as dadv)
             if (xVol > verySmall .and. xVol < gatekeeperVol) then
                 dadv = ((two * gatekeeperArea) / ((p + two) * gatekeeperVol)) * &
                        ((xVol / gatekeeperVol) ** (-p / (p + two)))
+                dtaudv = tau
             else
                 dadv = zero
+                dtaudv = zero
             end if
 
             ! dgdv: derivative of net flux w.r.t. volume
-            dgdv = dadv * (pInput - qInput) - dadv * eLosses - tau
+            dgdv = dadv * (pInput - qInput) - dadv * eLosses - dtaudv
 
             ! update constraints for bracketing
             if (xRes > zero) xMin = xVol

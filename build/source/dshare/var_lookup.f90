@@ -871,12 +871,13 @@ MODULE var_lookup
                                                                          51, 52, 53, 54, 55, 56, 57, 58, 59, 60)
 
  ! named variables: basin-average parameters (including HDS parameters)
- type(iLook_bpar),    public,parameter :: iLookBPAR     =ilook_bpar    (  1,  2,  3,  4,  5, 6, 7, 8, 9, 10)
+ type(iLook_bpar),    public,parameter :: iLookBPAR     =ilook_bpar    (  1,  2,  3,  4,  5,  6,  7,  8,  9, 10,&
+                                                                         11, 12, 13, 14, 15)
 
  ! named variables: basin-average variables (including HDS variables)
  type(iLook_bvar),    public,parameter :: iLookBVAR     =ilook_bvar    (  1,  2,  3,  4,  5,  6,  7,  8,  9, 10,&
                                                                          11, 12, 13, 14, 15, 16, 17, 18, 19, 20,&
-                                                                         21)
+                                                                         21, 22, 23, 24, 25, 26, 27)
 
  ! named variables in varibale type structure
  type(iLook_varType), public,parameter :: iLookVarType  =ilook_varType (  1,  2,  3,  4,  5,  6,  7,  8,  9, 10,&

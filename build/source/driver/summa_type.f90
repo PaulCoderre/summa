@@ -91,10 +91,15 @@ private
 type, public :: config_info
   ! logging
   integer(i4b)                   :: iulog_summa = output_unit ! output unit for log files
+  ! paths for a specific experiment
+  character(len=1024)            :: cwd                     ! Current working directory
+  character(len=:),  allocatable :: home_path_override      ! Command-line override for home_path
+  character(len=:),  allocatable :: persistent_output       ! Directory for persistent output
   ! configuration flags
   logical(lgt)                   :: read_cli = .true.       ! .true. = read command-line interface
   logical(lgt)                   :: read_config = .true.    ! .true. = read configuration files
   ! Multi-case configuration
+  logical(lgt)                   :: is_case_root = .true.   ! .true. for rank 0 within a model case
   integer(i4b)                   :: cases_per_node = 1      ! Number of concurrent cases per node
   character(len=:),  allocatable :: manifest_file           ! Path and name of the multi-case manifest
   character(len=64), allocatable :: case_names(:)           ! Names of cases defined in the manifest

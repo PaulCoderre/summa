@@ -181,6 +181,13 @@ contains
     !       depth, so glacier runs should set f_hydCond explicitly rather than take this default
     parFallback(iLookPARAM%f_hydCond)%default_val = 0.75_rkind
   end if
+  ! Oudin et al. (2005) potential evaporation parameters used by HDS (original values of the formula)
+  if (parFallback(iLookPARAM%oudinPETScaleK1)%default_val < 0.99_rkind*realMissing) then
+    parFallback(iLookPARAM%oudinPETScaleK1)%default_val = 100._rkind
+  end if
+  if (parFallback(iLookPARAM%oudinPETTempThrK2)%default_val < 0.99_rkind*realMissing) then
+    parFallback(iLookPARAM%oudinPETTempThrK2)%default_val = 5._rkind
+  end if
  else
   ! glacier parameters
   if (parFallback(iLookBPAR%glacStor_kIce)%default_val < 0.99_rkind*realMissing) then ! 5-29
@@ -203,6 +210,38 @@ contains
   endif
   if (parFallback(iLookBPAR%latMoraineWidth)%default_val < 0.99_rkind*realMissing) then
     parFallback(iLookBPAR%latMoraineWidth)%default_val = 200._rkind ! from looking at Alaska glaciers (m)
+  endif
+  ! HDS pothole storage parameters: zero depression depth means no depressions, so HDS is inactive unless set per GRU
+  if (parFallback(iLookBPAR%depressionDepth)%default_val < 0.99_rkind*realMissing) then
+    parFallback(iLookBPAR%depressionDepth)%default_val = 0._rkind
+  endif
+  if (parFallback(iLookBPAR%depressionAreaFrac)%default_val < 0.99_rkind*realMissing) then
+    parFallback(iLookBPAR%depressionAreaFrac)%default_val = 0._rkind
+  endif
+  if (parFallback(iLookBPAR%depressionCatchAreaFrac)%default_val < 0.99_rkind*realMissing) then
+    parFallback(iLookBPAR%depressionCatchAreaFrac)%default_val = 0._rkind
+  endif
+  if (parFallback(iLookBPAR%depression_p)%default_val < 0.99_rkind*realMissing) then
+    parFallback(iLookBPAR%depression_p)%default_val = 1.72_rkind
+  endif
+  if (parFallback(iLookBPAR%depression_b)%default_val < 0.99_rkind*realMissing) then
+    parFallback(iLookBPAR%depression_b)%default_val = 1._rkind
+  endif
+  ! HDS gatekeeper parameters: zero depth or area fraction means no gatekeeper
+  if (parFallback(iLookBPAR%gatekeeperDepth)%default_val < 0.99_rkind*realMissing) then
+    parFallback(iLookBPAR%gatekeeperDepth)%default_val = 0._rkind
+  endif
+  if (parFallback(iLookBPAR%gatekeeperAreaFrac)%default_val < 0.99_rkind*realMissing) then
+    parFallback(iLookBPAR%gatekeeperAreaFrac)%default_val = 0._rkind
+  endif
+  if (parFallback(iLookBPAR%gateCatchAreaFrac)%default_val < 0.99_rkind*realMissing) then
+    parFallback(iLookBPAR%gateCatchAreaFrac)%default_val = 0._rkind
+  endif
+  if (parFallback(iLookBPAR%gatekeeperDrainFrac)%default_val < 0.99_rkind*realMissing) then
+    parFallback(iLookBPAR%gatekeeperDrainFrac)%default_val = 0._rkind
+  endif
+  if (parFallback(iLookBPAR%gatekeeper_p)%default_val < 0.99_rkind*realMissing) then
+    parFallback(iLookBPAR%gatekeeper_p)%default_val = 1.72_rkind
   endif
  end if
 

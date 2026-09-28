@@ -174,6 +174,9 @@ integer(i4b),parameter,public :: readFullSeries       = 362    ! read full forci
 ! look-up values for the buffered write of model output
 integer(i4b),parameter,public :: writePerStep         = 371    ! write data per time step (default)
 integer(i4b),parameter,public :: writeFullSeries      = 372    ! write all data for a given output file
+! look-up values for the choice of prairie pothole parameterization
+integer(i4b),parameter,public :: noPotholes           = 381    ! no explicit pothole parameterization
+integer(i4b),parameter,public :: HDSmodel             = 382    ! Hysteretic Depressional Storage model implementation
 
 ! ----------------------------------------------------------------------------------------------------------- 
 contains
@@ -727,6 +730,15 @@ subroutine mDecisions(err,message)
     case('writeFullSeries'               );  model_decisions(iLookDECISIONS%write_buff)%iDecision = writeFullSeries ! write all data for a given output file
     case default
       err=10; message=trim(message)//"unknown option for method used to write model output [option="//trim(model_decisions(iLookDECISIONS%write_buff)%cDecision)//"]"; return
+  end select
+
+  ! choice of prairie pothole representation
+  ! NOTE: use noPotholes as the default
+  select case(trim(model_decisions(iLookDECISIONS%prPotholes)%cDecision))
+    case('noPotholes','notPopulatedYet'); model_decisions(iLookDECISIONS%prPotholes)%iDecision = noPotholes ! no representation of prairie potholes
+    case('HDSmodel'                    ); model_decisions(iLookDECISIONS%prPotholes)%iDecision = HDSmodel   ! Hysteretic Depressional Storage model
+    case default
+      err=10; message=trim(message)//"unknown option for prairie potholes [option="//trim(model_decisions(iLookDECISIONS%prPotholes)%cDecision)//"]"; return
   end select
 
   ! -----------------------------------------------------------------------------------------------------------------------------------------------

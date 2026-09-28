@@ -80,6 +80,7 @@ MODULE var_lookup
   integer(i4b)    :: surfRun_SE = integerMissing     ! choice of parameterization for saturation excess surface runoff
   integer(i4b)    :: read_force = integerMissing     ! method used to read forcing data (per step or full read)
   integer(i4b)    :: write_buff = integerMissing     ! method used to buffer model write (none, per file)
+  integer(i4b)    :: prPotholes = integerMissing     ! choice of method for prairie potholes representation
 
  endtype iLook_decision
 
@@ -354,6 +355,9 @@ MODULE var_lookup
   integer(i4b)    :: zmaxLayer2_upper      = integerMissing    ! maximum layer depth for the 2nd layer when > 2 layers (m)
   integer(i4b)    :: zmaxLayer3_upper      = integerMissing    ! maximum layer depth for the 3rd layer when > 3 layers (m)
   integer(i4b)    :: zmaxLayer4_upper      = integerMissing    ! maximum layer depth for the 4th layer when > 4 layers (m)
+  ! Oudin et al. (2005) potential evaporation parameters (for HDS)
+  integer(i4b)    :: oudinPETScaleK1       = integerMissing    ! Oudin PET formula scaling factor (deg C)
+  integer(i4b)    :: oudinPETTempThrK2     = integerMissing    ! Oudin PET formula temperature threshold (deg C)
  endtype iLook_param
 
  ! ***********************************************************************************************************
@@ -865,6 +869,18 @@ MODULE var_lookup
   integer(i4b)    :: wallErosionRate            = integerMissing ! glacier wall erosion rate input for debris advection (mm yr-1)
   integer(i4b)    :: debrisCritStress           = integerMissing ! critical driving stress where debris slides on terminal wedge (Pa)
   integer(i4b)    :: latMoraineWidth            = integerMissing ! lateral moraine width or rockfall length (m)
+  ! HDS pothole storage
+  integer(i4b)    :: depressionDepth            = integerMissing ! average depth of depressional storage (depressionVol/depressionArea) (m)
+  integer(i4b)    :: depressionAreaFrac         = integerMissing ! fractional depressional area (depressionArea/basinArea) (-)
+  integer(i4b)    :: depressionCatchAreaFrac    = integerMissing ! fractional area (of the landArea = basinArea - depressionArea) that drains to the depressions (-)
+  integer(i4b)    :: depression_p               = integerMissing ! shape of the slope profile (-)
+  integer(i4b)    :: depression_b               = integerMissing ! shape of contributing fraction curve (-)
+  ! HDS gatekeeper (large gatekeeping pothole)
+  integer(i4b)    :: gatekeeperDepth            = integerMissing ! average depth of gatekeeper depressional storage (gatekeeperVol/gatekeeperArea) (m)
+  integer(i4b)    :: gatekeeperAreaFrac         = integerMissing ! fractional gatekeeper depressional area (gatekeeperArea/basinArea) (-)
+  integer(i4b)    :: gateCatchAreaFrac          = integerMissing ! fractional area (of the landArea = basinArea - depressionArea - gatekeeperArea) that drains directly to the gatekeeper (-)
+  integer(i4b)    :: gatekeeperDrainFrac        = integerMissing ! fraction of meta-depression outflow intercepted by the gatekeeper (-)
+  integer(i4b)    :: gatekeeper_p               = integerMissing ! shape of the gatekeeper slope profile (-)
  endtype iLook_bpar
 
  ! ***********************************************************************************************************
@@ -899,6 +915,22 @@ MODULE var_lookup
   integer(i4b)    :: glacSnowRunoffFuture       = integerMissing ! per glacier snow reservoir runoff in future time steps (m s-1)
   integer(i4b)    :: glacFirnRunoffFuture       = integerMissing ! per glacier firn reservoir runoff in future time steps (m s-1)
   integer(i4b)    :: glacierRoutedRunoff        = integerMissing ! lapsed glacier runoff (m s-1)
+  ! define variables for HDS pothole storage
+  integer(i4b)    :: vMin                       = integerMissing ! volume of water in the meta depression at the start of a fill period (m3)
+  integer(i4b)    :: depConAreaFrac             = integerMissing ! contributing area fraction of pothole dominated areas (-)
+  integer(i4b)    :: basinConAreaFrac           = integerMissing ! contributing area fraction of the entire basin from pothole and non-pothole areas (-)
+  integer(i4b)    :: pondVolFrac                = integerMissing ! fractional pond volume at the end of time step (-)
+  integer(i4b)    :: pondVol                    = integerMissing ! pond volume at the end of time step (m3)
+  integer(i4b)    :: pondArea                   = integerMissing ! pond area at the end of the time step (m2)
+  integer(i4b)    :: pondOutflow                = integerMissing ! pond outflow (m3)
+  integer(i4b)    :: pondEvap                   = integerMissing ! pond evaporation (kg m-2 s-1)
+  ! define variables for HDS gatekeeper (large gatekeeping pothole)
+  integer(i4b)    :: gkConAreaFrac              = integerMissing ! contributing area fraction of the gatekeeper (binary: contributing only when spilling) (-)
+  integer(i4b)    :: gkPondVolFrac              = integerMissing ! fractional gatekeeper pond volume at the end of time step (-)
+  integer(i4b)    :: gkPondVol                  = integerMissing ! gatekeeper pond volume at the end of time step (m3)
+  integer(i4b)    :: gkPondArea                 = integerMissing ! gatekeeper pond area at the end of the time step (m2)
+  integer(i4b)    :: gkOutflow                  = integerMissing ! gatekeeper outflow (m3)
+  integer(i4b)    :: gkPondEvap                 = integerMissing ! gatekeeper pond evaporation (kg m-2 s-1)
  endtype iLook_bvar
 
  ! ***********************************************************************************************************
@@ -981,7 +1013,7 @@ MODULE var_lookup
                                                                          11, 12, 13, 14, 15, 16, 17, 18, 19, 20,&
                                                                          21, 22, 23, 24, 25, 26, 27, 28, 29, 30,&
                                                                          31, 32, 33, 34, 35, 36, 37, 38, 39, 40,&
-                                                                         41, 42, 43, 44)
+                                                                         41, 42, 43, 44, 45)
  ! named variables: model time
  type(iLook_time),    public,parameter :: iLookTIME     =iLook_time    (  1,  2,  3,  4,  5,  6,  7)
  ! named variables: model forcing data
@@ -1012,7 +1044,7 @@ MODULE var_lookup
                                                                         161,162,163,164,165,166,167,168,169,170,&
                                                                         171,172,173,174,175,176,177,178,179,180,&
                                                                         181,182,183,184,185,186,187,188,189,190,&
-                                                                        191,192,193,194,195,196)
+                                                                        191,192,193,194,195,196,197,198)
  ! named variables: model prognostic (state) variables
  type(iLook_prog),   public,parameter  :: iLookPROG     =iLook_prog    (  1,  2,  3,  4,  5,  6,  7,  8,  9, 10,&
                                                                          11, 12, 13, 14, 15, 16, 17, 18, 19, 20,&
@@ -1062,12 +1094,14 @@ MODULE var_lookup
                                                                          61, 62, 63, 64, 65, 66, 67, 68, 69, 70,&
                                                                          71)
  ! named variables: basin-average parameters
- type(iLook_bpar),    public,parameter :: iLookBPAR     =iLook_bpar    (  1,  2,  3,  4,  5,  6,  7,  8, 9,  10,&
-                                                                          11, 12)
+ type(iLook_bpar),    public,parameter :: iLookBPAR     =iLook_bpar    (  1,  2,  3,  4,  5,  6,  7,  8,  9, 10,&
+                                                                         11, 12, 13, 14, 15, 16, 17, 18, 19, 20,&
+                                                                         21, 22)
  ! named variables: basin-average variables
  type(iLook_bvar),    public,parameter :: iLookBVAR     =iLook_bvar    (  1,  2,  3,  4,  5,  6,  7,  8,  9, 10,&
                                                                          11, 12, 13, 14, 15, 16, 17, 18, 19, 20,&
-                                                                         21, 22, 23, 24)
+                                                                         21, 22, 23, 24, 25, 26, 27, 28, 29, 30,&
+                                                                         31, 32, 33, 34, 35, 36, 37, 38)
  ! named variables: basin-grid variables
  type(iLook_grid),    public,parameter :: iLookGRID     =iLook_grid    (  1,  2,  3,  4,  5)
  ! named variables in variable type structure

@@ -772,8 +772,11 @@ contains
  USE var_lookup,only:iLookINDEX             ! named variables for structure elements
  USE var_lookup,only:iLookVarType           ! named variables for structure elements
  USE var_lookup,only:iLookBVAR              ! named variables for structure elements
+ USE var_lookup,only:iLookDECISIONS         ! named variables for model decisions
  ! constants
  USE globalData,only:gru_struc              ! gru-hru mapping structures
+ USE globalData,only:model_decisions        ! model decision structure
+ USE mDecisions_module,only:HDSmodel        ! Hysteretic Depressional Storage model for prairie potholes
  ! external routines
  USE netcdf_util_module,only:nc_file_close  ! close netcdf file
  USE netcdf_util_module,only:nc_file_open   ! open netcdf file
@@ -802,6 +805,9 @@ contains
  integer(i4b)                       :: ncid          ! netcdf file id
  integer(i4b),allocatable           :: ncVarID(:)    ! netcdf variable id
  integer(i4b),dimension(7)          :: ngdx          ! intermediate array of loop indices for glacier variables
+ integer(i4b),dimension(7)          :: nhdx          ! intermediate array of loop indices for HDS pothole storage variables
+ integer(i4b)                       :: nGlacVars     ! number of glacier variables written to state file
+ logical(lgt)                       :: isHDS         ! flag to write HDS pothole storage variables
  integer(i4b),dimension(4)          :: nidx          ! intermediate array of loop indices for index variables
  integer(i4b)                       :: nSnow         ! number of snow layers
  integer(i4b)                       :: nLake         ! number of lake layers
@@ -867,9 +873,18 @@ contains
 
  ! include additional basin variable in ID array
  size_prog = nProgVars+1 ! +1 for future runoff variable
+ nGlacVars = 0
  if (maxGlaciers > 0)then
    ngdx = (/iLookBVAR%basin__GlacierStorage,iLookBVAR%updateJulDay,iLookBVAR%glacierAblArea,iLookBVAR%glacierAccArea,iLookBVAR%glacIceRunoffFuture,iLookBVAR%glacSnowRunoffFuture,iLookBVAR%glacFirnRunoffFuture/)
-   size_prog =  size_prog+size(ngdx)
+   nGlacVars = size(ngdx)
+   size_prog =  size_prog+nGlacVars
+ endif
+ ! HDS pothole storage states (meta depression + gatekeeper)
+ isHDS = (model_decisions(iLookDECISIONS%prPotholes)%iDecision == HDSmodel)
+ if (isHDS)then
+   nhdx = (/iLookBVAR%pondVolFrac, iLookBVAR%vMin, iLookBVAR%depConAreaFrac, iLookBVAR%pondArea, &
+            iLookBVAR%gkPondVolFrac, iLookBVAR%gkConAreaFrac, iLookBVAR%gkPondArea/)
+   size_prog = size_prog+size(nhdx)
  endif
  allocate(ncVarID(size_prog+size(nidx)))
 
@@ -942,6 +957,18 @@ contains
     err = nf90_put_att(ncid,ncVarID(nProgVars+1+i),'units',trim(bvar_meta(iVar)%varunit)); call netcdf_err(err,message)
    end do ! iVar
  endif ! (if glaciers)
+
+ if(isHDS)then ! if HDS is active, include the pothole storage states
+   do i = 1,size(nhdx)
+    iVar = nhdx(i)
+    err = nf90_def_var(ncid,trim(bvar_meta(iVar)%varName),nf90_double,(/gruDimID,scalDimID/),ncVarID(nProgVars+1+nGlacVars+i))
+    if(err/=0)then; message=trim(message)//' [variable '//trim(bvar_meta(iVar)%varName)//']';return; end if
+
+    ! add parameter description and units
+    err = nf90_put_att(ncid,ncVarID(nProgVars+1+nGlacVars+i),'long_name',trim(bvar_meta(iVar)%vardesc)); call netcdf_err(err,message)
+    err = nf90_put_att(ncid,ncVarID(nProgVars+1+nGlacVars+i),'units',trim(bvar_meta(iVar)%varunit)); call netcdf_err(err,message)
+   end do ! iVar
+ endif ! (if HDS)
   
  ! define index variables
  do i=1,size(nidx)
@@ -1034,6 +1061,14 @@ contains
        case(iLookVarType%glacier); err=nf90_put_var(ncid,ncVarID(nProgVars+1+i),(/bvar_data%gru(iGRU)%var(iVar)%dat/), start=(/iGRU,1/),count=(/1,nGlac/))
        case default; err=20; message=trim(message)//'unknown var type'; return
       end select
+      if (err/=0) message=trim(message)//'writing variable:'//trim(bvar_meta(iVar)%varName); call netcdf_err(err,message); if (err/=0) return; err=0; message='writeRestart/'
+    end do
+  endif
+
+  if (isHDS)then ! if HDS is active, include the pothole storage states
+    do i=1,size(nhdx)
+      iVar = nhdx(i)
+      err=nf90_put_var(ncid,ncVarID(nProgVars+1+nGlacVars+i),(/bvar_data%gru(iGRU)%var(iVar)%dat/), start=(/iGRU,1/),count=(/1,nScalar/))
       if (err/=0) message=trim(message)//'writing variable:'//trim(bvar_meta(iVar)%varName); call netcdf_err(err,message); if (err/=0) return; err=0; message='writeRestart/'
     end do
   endif

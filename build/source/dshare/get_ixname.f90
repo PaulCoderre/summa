@@ -102,6 +102,7 @@ contains
   case('surfRun_SE'      ); get_ixdecisions=iLookDECISIONS%surfRun_SE  ! choice of parameterization for saturation excess surface runoff
   case('read_force'      ); get_ixdecisions=iLookDECISIONS%read_force  ! method used to read forcing data (per step or full read)
   case('write_buff'      ); get_ixdecisions=iLookDECISIONS%write_buff  ! method used to buffer writing of model output (none, full)
+  case('prPotholes'      ); get_ixdecisions=iLookDECISIONS%prPotholes  ! choice of method for prairie potholes representation
   ! get to here if cannot find the variable
   case default
    get_ixdecisions = integerMissing
@@ -450,6 +451,9 @@ contains
   case('zmaxLayer2_upper'         ); get_ixParam = iLookPARAM%zmaxLayer2_upper       ! maximum layer depth for the 2nd layer when > 2 layers (m)
   case('zmaxLayer3_upper'         ); get_ixParam = iLookPARAM%zmaxLayer3_upper       ! maximum layer depth for the 3rd layer when > 3 layers (m)
   case('zmaxLayer4_upper'         ); get_ixParam = iLookPARAM%zmaxLayer4_upper       ! maximum layer depth for the 4th layer when > 4 layers (m)                              
+  ! Oudin et al. (2005) potential evaporation parameters (for HDS)
+  case('oudinPETScaleK1'          ); get_ixParam = iLookPARAM%oudinPETScaleK1        ! Oudin PET formula scaling factor (deg C)
+  case('oudinPETTempThrK2'        ); get_ixParam = iLookPARAM%oudinPETTempThrK2      ! Oudin PET formula temperature threshold (deg C)
   ! get to here if cannot find the variable
   case default
    get_ixParam = integerMissing
@@ -1031,6 +1035,17 @@ contains
   case('wallErosionRate'          ); get_ixBpar = iLookBPAR%wallErosionRate           ! glacier wall erosion rate input for debris advection (mm yr-1)
   case('debrisCritStress'         ); get_ixBpar = iLookBPAR%debrisCritStress          ! critical driving stress where debris slides on terminal wedge (Pa)
   case('latMoraineWidth'          ); get_ixBpar = iLookBPAR%latMoraineWidth           ! lateral moraine width or rockfall length (m)
+  ! HDS pothole storage and gatekeeper parameters
+  case('depressionDepth'          ); get_ixBpar = iLookBPAR%depressionDepth           ! average depth of depressional storage (m)
+  case('depressionAreaFrac'       ); get_ixBpar = iLookBPAR%depressionAreaFrac        ! fractional depressional area (-)
+  case('depressionCatchAreaFrac'  ); get_ixBpar = iLookBPAR%depressionCatchAreaFrac   ! fractional area of the landArea that drains to the depressions (-)
+  case('depression_p'             ); get_ixBpar = iLookBPAR%depression_p              ! shape of the slope profile (-)
+  case('depression_b'             ); get_ixBpar = iLookBPAR%depression_b              ! shape of contributing fraction curve (-)
+  case('gatekeeperDepth'          ); get_ixBpar = iLookBPAR%gatekeeperDepth           ! average depth of gatekeeper depressional storage (m)
+  case('gatekeeperAreaFrac'       ); get_ixBpar = iLookBPAR%gatekeeperAreaFrac        ! fractional gatekeeper depressional area (-)
+  case('gateCatchAreaFrac'        ); get_ixBpar = iLookBPAR%gateCatchAreaFrac         ! fractional area of the landArea that drains directly to the gatekeeper (-)
+  case('gatekeeperDrainFrac'      ); get_ixBpar = iLookBPAR%gatekeeperDrainFrac       ! fraction of meta-depression outflow intercepted by the gatekeeper (-)
+  case('gatekeeper_p'             ); get_ixBpar = iLookBPAR%gatekeeper_p              ! shape of the gatekeeper slope profile (-)
   ! get to here if cannot find the variable
   case default
    get_ixBpar = integerMissing
@@ -1077,6 +1092,21 @@ contains
   case('glacSnowRunoffFuture'          ); get_ixBvar = iLookBVAR%glacSnowRunoffFuture            ! per glacier snow reservoir runoff in future time steps (m s-1)
   case('glacFirnRunoffFuture'          ); get_ixBvar = iLookBVAR%glacFirnRunoffFuture            ! per glacier firn reservoir runoff in future time steps (m s-1)
   case('glacierRoutedRunoff'           ); get_ixBvar = iLookBVAR%glacierRoutedRunoff             ! lapsed glacier runoff (m s-1)
+  ! HDS pothole storage and gatekeeper variables
+  case('vMin'                        ); get_ixBvar = iLookBVAR%vMin                      ! volume of water in the meta depression at the start of a fill period (m3)
+  case('depConAreaFrac'              ); get_ixBvar = iLookBVAR%depConAreaFrac            ! contributing area fraction of pothole dominated areas (-)
+  case('basinConAreaFrac'            ); get_ixBvar = iLookBVAR%basinConAreaFrac          ! contributing area fraction of the entire basin (-)
+  case('pondVolFrac'                 ); get_ixBvar = iLookBVAR%pondVolFrac               ! fractional pond volume (-)
+  case('pondVol'                     ); get_ixBvar = iLookBVAR%pondVol                   ! pond volume (m3)
+  case('pondArea'                    ); get_ixBvar = iLookBVAR%pondArea                  ! pond area (m2)
+  case('pondOutflow'                 ); get_ixBvar = iLookBVAR%pondOutflow               ! pond outflow (m3)
+  case('pondEvap'                    ); get_ixBvar = iLookBVAR%pondEvap                  ! pond evaporation (kg m-2 s-1)
+  case('gkConAreaFrac'               ); get_ixBvar = iLookBVAR%gkConAreaFrac             ! contributing area fraction of the gatekeeper (-)
+  case('gkPondVolFrac'               ); get_ixBvar = iLookBVAR%gkPondVolFrac             ! fractional gatekeeper pond volume (-)
+  case('gkPondVol'                   ); get_ixBvar = iLookBVAR%gkPondVol                 ! gatekeeper pond volume (m3)
+  case('gkPondArea'                  ); get_ixBvar = iLookBVAR%gkPondArea                ! gatekeeper pond area (m2)
+  case('gkOutflow'                   ); get_ixBvar = iLookBVAR%gkOutflow                 ! gatekeeper outflow (m3)
+  case('gkPondEvap'                  ); get_ixBvar = iLookBVAR%gkPondEvap                ! gatekeeper pond evaporation (kg m-2 s-1)
   ! get to here if cannot find the variable
   case default
    get_ixBvar = integerMissing

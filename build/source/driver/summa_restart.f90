@@ -78,6 +78,10 @@ contains
  USE mDecisions_module,only:&
    fullStart,      & ! start with full aquifer
    emptyStart        ! start with empty aquifer
+ ! look-up values for the choice of prairie pothole representation
+ USE mDecisions_module,only:&
+   HDSmodel          ! Hysteretic Depressional Storage model for prairie potholes
+ USE HDS,only:init_summa_HDS                                 ! initialize HDS pothole storage states at the GRU level
  ! ---------------------------------------------------------------------------------------
  ! * variables
  ! ---------------------------------------------------------------------------------------
@@ -289,6 +293,13 @@ contains
     dt_init%gru(iGRU)%hru(iHRU)%dom(iDOM) = progStruct%gru(iGRU)%hru(iHRU)%dom(iDOM)%var(iLookPROG%dt_init)%dat(1) ! seconds
    end do
   end do
+
+  ! *****************************************************************************
+  ! *** initialize HDS pothole storage states at the GRU level
+  ! *****************************************************************************
+  if(model_decisions(iLookDECISIONS%prPotholes)%iDecision == HDSmodel)then
+   call init_summa_HDS(bvarStruct%gru(iGRU), bparStruct%gru(iGRU))
+  endif
 
  end do  ! end looping through GRUs
 

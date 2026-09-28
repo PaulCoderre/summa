@@ -101,6 +101,7 @@ set(MODRUN
     ${ENGINE_DIR}/derivforce.f90
     ${ENGINE_DIR}/convertEnthalpyTemp.f90
     ${ENGINE_DIR}/getVectorz.f90
+    ${ENGINE_DIR}/HDS.f90
     ${ENGINE_DIR}/indexState.f90
     ${ENGINE_DIR}/layerMerge.f90
     ${ENGINE_DIR}/layerDivide.f90

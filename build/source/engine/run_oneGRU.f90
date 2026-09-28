@@ -65,6 +65,7 @@ USE var_lookup,only:iLookBVAR          ! look-up values for basin-average model 
 USE var_lookup,only:iLookTIME          ! look-up values for model time data
 USE var_lookup,only:iLookPROG          ! look-up values for model prognostic (state) variables
 USE var_lookup,only:iLookPARAM         ! look-up values for model parameters
+USE var_lookup,only:iLookFORCE         ! look-up values for model forcing data
 
 ! provide access to model decisions
 USE globalData,only:model_decisions    ! model decision structure
@@ -90,6 +91,10 @@ USE mDecisions_module,only:       &
 USE mDecisions_module,only:       &
  localColumn,                     & ! separate groundwater representation in each local soil column
  singleBasin                        ! single groundwater store over the entire basin
+
+! look-up values for the choice of prairie pothole representation
+USE mDecisions_module,only:       &
+ HDSmodel                           ! Hysteretic Depressional Storage model for prairie potholes
 
  implicit none
 private
@@ -131,6 +136,8 @@ subroutine run_oneGRU(&
   USE glacAreaChange_module,only:glacAreaChange               ! change glacier area with ice flow model
   USE glacAreaChange_module,only:updateGlacDomain             ! change glacier domain area, elevation, layering
   USE time_utils_module,only:elapsedSec                       ! calculate the elapsed time
+  USE HDS,only:runDepression                                  ! run HDS pothole storage dynamics
+  USE derivforce_module,only:calcPotentialEvap_Oudin2005      ! potential evaporation (Oudin et al., 2005) for HDS
   ! ----- define dummy variables ------------------------------------------------------------------------------------------
   implicit none
   ! model control
@@ -174,6 +181,10 @@ subroutine run_oneGRU(&
   real(rkind)                         :: glacIceMelt                    ! glacier ice reservoir melt (m s-1)
   real(rkind)                         :: glacSnowMelt                   ! glacier snow reservoir melt (m s-1)
   real(rkind)                         :: glacFirnMelt                   ! glacier firn reservoir melt (m s-1)
+  ! HDS pothole storage
+  real(rkind)                         :: fracHRU                        ! fractional area of a given HRU in GRU (-)
+  real(rkind)                         :: basinPrecip                    ! area-weighted basin precipitation (kg m-2 s-1 = mm s-1)
+  real(rkind)                         :: basinPotentialEvap             ! area-weighted basin potential evaporation (mm s-1)
   ! glacier area update
   logical(lgt)                        :: updateGlacArea                 ! flag to update glacier area this time step
   logical(lgt)                        :: updateLakeArea                 ! flag to update wetland area this time step
@@ -232,6 +243,8 @@ subroutine run_oneGRU(&
   glacIceMelt    = 0._rkind
   glacSnowMelt   = 0._rkind
   glacFirnMelt   = 0._rkind
+  basinPrecip        = 0._rkind
+  basinPotentialEvap = 0._rkind
   updateGlacArea = .false.
   updateLakeArea = .false.
 
@@ -345,6 +358,22 @@ subroutine run_oneGRU(&
                    err,cmessage)                      ! intent(out):   error control
     if(err/=0)then; message=trim(message)//trim(cmessage); return; endif
     ixComputeVegFlux%hru(iHRU) = merge(yes, no, computeVegFluxFlag)
+
+    ! ----- area-weighted basin (GRU) precipitation and potential evaporation for HDS ----------------------------------------
+    if(model_decisions(iLookDECISIONS%prPotholes)%iDecision == HDSmodel)then
+      associate(pptrate   => forcHRU%hru(iHRU)%var(iLookFORCE%pptrate),                             & ! precipitation rate (kg m-2 s-1)
+                SWRadAtm  => forcHRU%hru(iHRU)%var(iLookFORCE%SWRadAtm),                            & ! downwelling shortwave radiation (W m-2)
+                airtemp   => forcHRU%hru(iHRU)%var(iLookFORCE%airtemp),                             & ! air temperature (K)
+                scaleK1   => mparHRU%hru(iHRU)%dom(1)%var(iLookPARAM%oudinPETScaleK1)%dat(1),       & ! Oudin PET scaling factor (deg C)
+                tempThrK2 => mparHRU%hru(iHRU)%dom(1)%var(iLookPARAM%oudinPETTempThrK2)%dat(1))       ! Oudin PET temperature threshold (deg C)
+        if(scaleK1 <= 0._rkind .or. tempThrK2 < 0._rkind)then
+          err=20; write(message(len_trim(message)+1:),'(A,I0,A)') 'hruId=',gruInfo%hruInfo(iHRU)%hru_id,'/missing or invalid oudinPETScaleK1 or oudinPETTempThrK2'; return
+        endif
+        fracHRU = attrHRU%hru(iHRU)%var(iLookATTR%HRUarea)/bvarData%var(iLookBVAR%basin__totalArea)%dat(1)
+        basinPrecip        = basinPrecip        + pptrate*fracHRU
+        basinPotentialEvap = basinPotentialEvap + calcPotentialEvap_Oudin2005(SWRadAtm, airtemp, scaleK1, tempThrK2)*fracHRU
+      end associate
+    endif
 
     ! ----- lateral flow to the downslope HRU, and area-weighted basin (GRU) fluxes ------------------------------------------
     kHRU = downIdx(iHRU) ! the downslope HRU, found once above with the cascade ordering
@@ -484,6 +513,10 @@ subroutine run_oneGRU(&
     else
       bvar(iLookBVAR%basin__TotalRunoff)%dat(1) = bvar(iLookBVAR%basin__SurfaceRunoff)%dat(1) + bvar(iLookBVAR%basin__ColumnOutflow)%dat(1)/totalArea + bvar(iLookBVAR%basin__SoilDrainage)%dat(1)
     endif
+
+    ! pass the total runoff through the HDS pothole storage (modifies basin__TotalRunoff)
+    ! NOTE: glacier runoff bypasses the depressions and is added after the sub-grid routing below
+    if(model_decisions(iLookDECISIONS%prPotholes)%iDecision == HDSmodel) call runDepression(bvarData, bparData, basinPrecip, basinPotentialEvap)
 
     call qOverland(&
                    ! input

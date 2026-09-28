@@ -279,6 +279,9 @@ contains
  USE globalData,only:bvar_meta                          ! metadata for basin (GRU) variables
  USE globalData,only:iname_soil,iname_snow,iname_glce,iname_lake ! named variables to describe the type of 
  USE globalData,only:maxGlaciers                        ! maximum number of glaciers in a GRU
+ USE globalData,only:model_decisions                    ! model decision structure
+ USE var_lookup,only:iLookDECISIONS                     ! look-up values for model decisions
+ USE mDecisions_module,only:HDSmodel                    ! Hysteretic Depressional Storage model for prairie potholes
  USE netcdf_util_module,only:nc_file_open               ! open netcdf file
  USE netcdf_util_module,only:nc_file_close              ! close netcdf file
  USE netcdf_util_module,only:netcdf_err                 ! netcdf error handling
@@ -313,6 +316,7 @@ contains
  integer(i4b)                              :: iVar,i,j                      ! loop indices
  integer(i4b),dimension(1)                 :: nrdx                          ! intermediate array of loop indices for basin variables
  integer(i4b),dimension(7)                 :: ngdx                          ! intermediate array of loop indices for glacier variables
+ integer(i4b),dimension(7)                 :: nhdx                          ! intermediate array of loop indices for HDS pothole storage variables
  integer(i4b)                              :: iGRU,iHRU,iDOM,iGlac,iGrid    ! loop indices
  integer(i4b)                              :: dimID                         ! varible dimension ids
  integer(i4b)                              :: ncVarID                       ! variable ID in netcdf file
@@ -773,6 +777,49 @@ else
    end do ! end looping through basin variables
    call read_icondGlac(ncid, nGRU_local, fileGRU, index_to_gruid, bvarData, gridData, err, cmessage); if(err/=0)then; message=trim(message)//trim(cmessage); return; endif
  endif  ! end if case for glac variables being in init. cond. file
+
+ ! --------------------------------------------------------------------------------------------------------
+ ! (7) get the HDS pothole storage states
+ ! --------------------------------------------------------------------------------------------------------
+ ! NOTE: variables may be (gru) or (gru,scalarv); missing variables are initialized from pondVolFrac in init_summa_HDS
+ if(model_decisions(iLookDECISIONS%prPotholes)%iDecision == HDSmodel)then
+   if(fileGRU < 1)then
+     message=trim(message)//'HDS pothole storage states require a GRU dimension in the initial conditions file'
+     err=20; return
+   endif
+   nhdx = (/iLookBVAR%pondVolFrac, iLookBVAR%vMin, iLookBVAR%depConAreaFrac, iLookBVAR%pondArea, &
+            iLookBVAR%gkPondVolFrac, iLookBVAR%gkConAreaFrac, iLookBVAR%gkPondArea/)
+   do i = 1,size(nhdx)
+    iVar = nhdx(i)
+
+    ! get gru-based variable id
+    err = nf90_inq_varid(ncid,trim(bvar_meta(iVar)%varName),ncVarID)
+    if(err/=nf90_noerr)then
+      if(isPrint) write(*,*) 'WARNING: '//trim(bvar_meta(iVar)%varName)//' is not in the initial conditions file ... initializing from pondVolFrac'
+      err=nf90_noerr ! reset this err
+      cycle
+    endif
+
+    ! get data
+    allocate(varData2(fileGRU,1),stat=err)
+    if(err/=0)then; message=trim(message)//'problem allocating HDS variable data'; return; endif
+    err = nf90_get_var(ncid,ncVarID,varData2); call netcdf_err(err,message)
+    if(err/=nf90_noerr)then; message=trim(message)//': problem getting the data for variable '//trim(bvar_meta(iVar)%varName); return; endif
+
+    ! store data in basin var structure
+    do iGRU = 1,nGRU_local
+      iGRU_global = index_to_gruid(iGRU) ! index of GRU in the netcdf file
+      bvarData%gru(iGRU)%var(iVar)%dat(1) = varData2(iGRU_global,1)
+      if(abs(bvarData%gru(iGRU)%var(iVar)%dat(1) - nf90_fill_double) < epsilon(varData2))then
+        message=trim(message)//"data set to the fill value (name='"//trim(bvar_meta(iVar)%varName)//"')"; err=20; return
+      endif
+    end do ! iGRU loop
+
+    ! deallocate storage vector for next variable
+    deallocate(varData2,stat=err)
+    if(err/=0)then; message=trim(message)//'problem deallocating HDS variable data'; return; endif
+   end do ! end looping through HDS variables
+ endif ! end if HDS
  call nc_file_close(ncid,err,cmessage)
  if(err/=nf90_noerr)then;message=trim(message)//trim(cmessage);return;end if
 

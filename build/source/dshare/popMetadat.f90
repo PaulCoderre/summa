@@ -332,6 +332,9 @@ subroutine popMetadat(err,message)
   mpar_meta(iLookPARAM%zmaxLayer2_upper)               = var_info('zmaxLayer2_upper'               , 'maximum layer depth for the 2nd layer when > 2 layers'            , 'm'               , get_ixVarType('scalarv'), iMissVec, iMissVec, .false.)
   mpar_meta(iLookPARAM%zmaxLayer3_upper)               = var_info('zmaxLayer3_upper'               , 'maximum layer depth for the 3rd layer when > 3 layers'            , 'm'               , get_ixVarType('scalarv'), iMissVec, iMissVec, .false.)
   mpar_meta(iLookPARAM%zmaxLayer4_upper)               = var_info('zmaxLayer4_upper'               , 'maximum layer depth for the 4th layer when > 4 layers'            , 'm'               , get_ixVarType('scalarv'), iMissVec, iMissVec, .false.)
+  ! Oudin et al. (2005) potential evaporation parameters (for HDS)
+  mpar_meta(iLookPARAM%oudinPETScaleK1)                = var_info('oudinPETScaleK1'                , 'Oudin PET formula scaling factor'                                 , 'deg C'           , get_ixVarType('scalarv'), iMissVec, iMissVec, .false.)
+  mpar_meta(iLookPARAM%oudinPETTempThrK2)              = var_info('oudinPETTempThrK2'              , 'Oudin PET formula temperature threshold'                          , 'deg C'           , get_ixVarType('scalarv'), iMissVec, iMissVec, .false.)
   ! -----
   ! * basin parameter data...
   ! -------------------------
@@ -350,6 +353,18 @@ subroutine popMetadat(err,message)
   bpar_meta(iLookBPAR%wallErosionRate)                 = var_info('wallErosionRate'                , 'glacier wall erosion rate input for debris advection'             , 'mm yr-1'         , get_ixVarType('scalarv'), iMissVec, iMissVec, .false.)
   bpar_meta(iLookBPAR%debrisCritStress)                = var_info('debrisCritStress'               , 'critical driving stress where debris slides on terminal wedge'    , 'Pa'              , get_ixVarType('scalarv'), iMissVec, iMissVec, .false.)
   bpar_meta(iLookBPAR%latMoraineWidth)                 = var_info('latMoraineWidth'                , 'lateral moraine width or rockfall length'                         , 'm'               , get_ixVarType('scalarv'), iMissVec, iMissVec, .false.)
+  ! HDS pothole storage parameters
+  bpar_meta(iLookBPAR%depressionDepth)                  = var_info('depressionDepth'                , 'average depth of depressional storage (depressionVol/depressionArea)', 'm', get_ixVarType('scalarv'), iMissVec, iMissVec, .false.)
+  bpar_meta(iLookBPAR%depressionAreaFrac)               = var_info('depressionAreaFrac'             , 'fractional depressional area (depressionArea/basinArea)', '-', get_ixVarType('scalarv'), iMissVec, iMissVec, .false.)
+  bpar_meta(iLookBPAR%depressionCatchAreaFrac)          = var_info('depressionCatchAreaFrac'        , 'fractional area of the landArea (basinArea - depressionArea) that drains to the depressions', '-', get_ixVarType('scalarv'), iMissVec, iMissVec, .false.)
+  bpar_meta(iLookBPAR%depression_p)                     = var_info('depression_p'                   , 'shape of the slope profile', '-', get_ixVarType('scalarv'), iMissVec, iMissVec, .false.)
+  bpar_meta(iLookBPAR%depression_b)                     = var_info('depression_b'                   , 'shape of contributing fraction curve', '-', get_ixVarType('scalarv'), iMissVec, iMissVec, .false.)
+  ! HDS gatekeeper (large gatekeeping pothole) parameters
+  bpar_meta(iLookBPAR%gatekeeperDepth)                  = var_info('gatekeeperDepth'                , 'average depth of gatekeeper depressional storage (gatekeeperVol/gatekeeperArea)', 'm', get_ixVarType('scalarv'), iMissVec, iMissVec, .false.)
+  bpar_meta(iLookBPAR%gatekeeperAreaFrac)               = var_info('gatekeeperAreaFrac'             , 'fractional gatekeeper depressional area (gatekeeperArea/basinArea)', '-', get_ixVarType('scalarv'), iMissVec, iMissVec, .false.)
+  bpar_meta(iLookBPAR%gateCatchAreaFrac)                = var_info('gateCatchAreaFrac'              , 'fractional area of the landArea (basinArea - depressionArea - gatekeeperArea) that drains directly to the gatekeeper', '-', get_ixVarType('scalarv'), iMissVec, iMissVec, .false.)
+  bpar_meta(iLookBPAR%gatekeeperDrainFrac)              = var_info('gatekeeperDrainFrac'            , 'fraction of meta-depression outflow intercepted by the gatekeeper', '-', get_ixVarType('scalarv'), iMissVec, iMissVec, .false.)
+  bpar_meta(iLookBPAR%gatekeeper_p)                     = var_info('gatekeeper_p'                   , 'shape of the gatekeeper slope profile', '-', get_ixVarType('scalarv'), iMissVec, iMissVec, .false.)
   ! -----
   ! * local model prognostic (state) variables...
   ! ---------------------------------------------
@@ -765,6 +780,22 @@ subroutine popMetadat(err,message)
   bvar_meta(iLookBVAR%glacSnowRunoffFuture)    = var_info('glacSnowRunoffFuture'   , 'per glacier snow reservoir runoff in future time steps'        , 'm s-1' , get_ixVarType('glacier'), iMissVec, iMissVec, .false.)
   bvar_meta(iLookBVAR%glacFirnRunoffFuture)    = var_info('glacFirnRunoffFuture'   , 'per glacier firn reservoir runoff in future time steps'        , 'm s-1' , get_ixVarType('glacier'), iMissVec, iMissVec, .false.)
   bvar_meta(iLookBVAR%glacierRoutedRunoff)     = var_info('glacierRoutedRunoff'    , 'lapsed glacier runoff'                                         , 'm s-1' , get_ixVarType('scalarv'), iMissVec, iMissVec, .false.)
+  ! HDS pothole storage variables
+  bvar_meta(iLookBVAR%vMin)                     = var_info('vMin'                   , 'volume of water in the meta depression at the start of a fill period', 'm3', get_ixVarType('scalarv'), iMissVec, iMissVec, .false.)
+  bvar_meta(iLookBVAR%depConAreaFrac)           = var_info('depConAreaFrac'         , 'contributing area fraction of pothole dominated areas', '-', get_ixVarType('scalarv'), iMissVec, iMissVec, .false.)
+  bvar_meta(iLookBVAR%basinConAreaFrac)         = var_info('basinConAreaFrac'       , 'contributing area fraction of the entire basin from pothole and non-pothole areas', '-', get_ixVarType('scalarv'), iMissVec, iMissVec, .false.)
+  bvar_meta(iLookBVAR%pondVolFrac)              = var_info('pondVolFrac'            , 'fractional pond volume at the end of time step', '-', get_ixVarType('scalarv'), iMissVec, iMissVec, .false.)
+  bvar_meta(iLookBVAR%pondVol)                  = var_info('pondVol'                , 'pond volume at the end of time step', 'm3', get_ixVarType('scalarv'), iMissVec, iMissVec, .false.)
+  bvar_meta(iLookBVAR%pondArea)                 = var_info('pondArea'               , 'pond area at the end of the time step', 'm2', get_ixVarType('scalarv'), iMissVec, iMissVec, .false.)
+  bvar_meta(iLookBVAR%pondOutflow)              = var_info('pondOutflow'            , 'pond outflow', 'm3', get_ixVarType('scalarv'), iMissVec, iMissVec, .false.)
+  bvar_meta(iLookBVAR%pondEvap)                 = var_info('pondEvap'               , 'pond evaporation', 'kg m-2 s-1', get_ixVarType('scalarv'), iMissVec, iMissVec, .false.)
+  ! HDS gatekeeper (large gatekeeping pothole) variables
+  bvar_meta(iLookBVAR%gkConAreaFrac)            = var_info('gkConAreaFrac'          , 'contributing area fraction of the gatekeeper (binary: contributing only when spilling)', '-', get_ixVarType('scalarv'), iMissVec, iMissVec, .false.)
+  bvar_meta(iLookBVAR%gkPondVolFrac)            = var_info('gkPondVolFrac'          , 'fractional gatekeeper pond volume at the end of time step', '-', get_ixVarType('scalarv'), iMissVec, iMissVec, .false.)
+  bvar_meta(iLookBVAR%gkPondVol)                = var_info('gkPondVol'              , 'gatekeeper pond volume at the end of time step', 'm3', get_ixVarType('scalarv'), iMissVec, iMissVec, .false.)
+  bvar_meta(iLookBVAR%gkPondArea)               = var_info('gkPondArea'             , 'gatekeeper pond area at the end of the time step', 'm2', get_ixVarType('scalarv'), iMissVec, iMissVec, .false.)
+  bvar_meta(iLookBVAR%gkOutflow)                = var_info('gkOutflow'              , 'gatekeeper outflow', 'm3', get_ixVarType('scalarv'), iMissVec, iMissVec, .false.)
+  bvar_meta(iLookBVAR%gkPondEvap)               = var_info('gkPondEvap'             , 'gatekeeper pond evaporation', 'kg m-2 s-1', get_ixVarType('scalarv'), iMissVec, iMissVec, .false.)
   ! -----
   ! * basin glacier grids
   ! -----------------------------------------
